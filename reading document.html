@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI Chatbot – Document Processing & Live News</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.21/mammoth.browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <style>
+    *,*:before,*:after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,Helvetica,sans-serif;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;height:100vh;display:flex;justify-content:center;align-items:center}
+    .chatbot-container{width:95%;max-width:1200px;height:92vh;background:rgba(255,255,255,.1);backdrop-filter:blur(10px);border-radius:20px;border:1px solid rgba(255,255,255,.15);display:flex;flex-direction:column;overflow:hidden}
+    .header{background:linear-gradient(135deg,#4facfe,#00f2fe);padding:15px 25px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+    .header h1{font-size:2rem;font-weight:700;display:flex;align-items:center;gap:8px}
+    .status-indicator{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.25);padding:6px 14px;border-radius:18px;font-size:.9rem}
+    .status-dot{width:10px;height:10px;border-radius:50%;background:#4ade80;animation:pulse 2s infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+    .controls{display:flex;flex-wrap:wrap;gap:10px}
+    .control-btn{background:rgba(255,255,255,.2);color:#fff;border:none;padding:8px 16px;border-radius:10px;cursor:pointer;font-size:.85rem;transition:.25s;user-select:none}
+    .control-btn:hover{background:rgba(255,255,255,.35);transform:translateY(-2px)}
+    .control-btn.active{background:#4ade80;color:#fff}
+    .main-content{flex:1;display:flex;overflow:hidden}
+    .sidebar{width:320px;background:rgba(255,255,255,.08);border-right:1px solid rgba(255,255,255,.12);padding:20px;overflow-y:auto}
+    .upload-section{background:rgba(255,255,255,.12);border:2px dashed rgba(255,255,255,.3);padding:20px;border-radius:12px;text-align:center;cursor:pointer;transition:.25s;position:relative}
+    .upload-section:hover{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.5)}
+    .upload-section.dragover{background:rgba(255,255,255,.25);border-color:#4ade80}
+    .upload-section input{display:none}
+    .upload-label{cursor:pointer;display:block;width:100%;height:100%}
+    .upload-label small{display:block;margin-top:8px;font-size:.8rem;opacity:.8}
+    .rag-info,.document-list,.news-config{margin-top:25px}
+    .document-item{background:rgba(255,255,255,.12);padding:8px 12px;margin-bottom:6px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;font-size:.85rem}
+    .document-status{font-size:.7rem;padding:2px 8px;border-radius:10px;font-weight:600}
+    .processed{background:#4ade80;color:#fff}
+    .processing{background:#fbbf24;color:#fff}
+    .error{background:#ef4444;color:#fff}
+    .news-config{background:rgba(255,255,255,.12);padding:15px;border-radius:12px}
+    .news-config h3{margin-bottom:10px;font-size:1.1rem}
+    .news-controls{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+    .news-btn{padding:6px 12px;border:none;border-radius:6px;background:rgba(255,255,255,.2);color:#fff;cursor:pointer;font-size:.8rem;transition:.25s;user-select:none}
+    .news-btn:hover{background:rgba(255,255,255,.35);transform:translateY(-1px)}
+    .news-btn.active{background:#4ade80;color:#fff}
+    .news-status{font-size:.8rem;padding:4px 8px;border-radius:6px;background:rgba(255,255,255,.15)}
+    .chat-area{flex:1;display:flex;flex-direction:column;overflow:hidden}
+    .messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px}
+    .message{max-width:80%;padding:14px 18px;border-radius:18px;font-size:.93rem;line-height:1.4;animation:slideIn .3s ease;word-wrap:break-word}
+    @keyframes slideIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+    .user-message{background:linear-gradient(135deg,#667eea,#764ba2);align-self:flex-end;color:#fff}
+    .ai-message{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);align-self:flex-start;color:#fff}
+    .system-message{background:rgba(34,197,94,.2);color:#4ade80;align-self:center;font-size:.8rem}
+    .message-with-context{position:relative}
+    .context-indicator{position:absolute;top:-8px;right:-8px;background:#4ade80;color:#fff;font-size:.7rem;padding:2px 6px;border-radius:10px;font-weight:700}
+    .news-indicator{background:#ff6b6b}
+    .input-area{display:flex;gap:10px;padding:18px 20px;background:rgba(255,255,255,.08);border-top:1px solid rgba(255,255,255,.12)}
+    .input-field{flex:1;padding:14px 18px;border:none;border-radius:25px;background:rgba(255,255,255,.15);color:#fff;font-size:1rem}
+    .input-field::placeholder{color:rgba(255,255,255,.7)}
+    .input-field:focus{outline:none;box-shadow:0 0 0 2px rgba(79,172,254,.5)}
+    .send-btn{background:linear-gradient(135deg,#4facfe,#00f2fe);border:none;border-radius:25px;color:#fff;font-weight:600;padding:14px 22px;cursor:pointer;transition:.25s;user-select:none}
+    .send-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 4px 12px rgba(79,172,254,.4)}
+    .send-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+    .loading{display:flex;align-items:center;justify-content:center;gap:8px;color:rgba(255,255,255,.85)}
+    .loading-dots{display:flex;gap:4px}
+    .loading-dot{width:6px;height:6px;border-radius:50%;background:#fff;animation:bounce 1.4s infinite ease-in-out}
+    .loading-dot:nth-child(1){animation-delay:-.32s}
+    .loading-dot:nth-child(2){animation-delay:-.16s}
+    @keyframes bounce{0%,80%,100%{transform:scale(0)}40%{transform:scale(1)}}
+    @media(max-width:768px){.chatbot-container{height:95vh}.main-content{flex-direction:column}.sidebar{width:100%;height:280px;border-right:none;border-bottom:1px solid rgba(255,255,255,.12)}.news-controls{flex-wrap:wrap}.controls{justify-content:center}.header{flex-direction:column;gap:15px}}
+  </style>
+</head>
+<body>
+  <div class="chatbot-container">
+    <div class="header">
+      <h1>🤖 AI Chatbot</h1>
+      <div class="status-indicator">
+        <div class="status-dot"></div>
+        <span id="statusText">Ready – Document Processing & News</span>
+      </div>
+      <div class="controls">
+        <button class="control-btn" id="clearChatBtn">🗑️ Clear Chat</button>
+        <button class="control-btn" id="downloadBtn">📥 Download</button>
+        <button class="control-btn active" id="streamToggle">🎯 Streaming: ON</button>
+        <button class="control-btn active" id="ragToggle">📄 RAG: ON</button>
+        <button class="control-btn" id="mcpToolsBtn">🛠️ MCP Tools</button>
+        <button class="control-btn" id="newsHelpBtn">📰 News Help</button>
+      </div>
+    </div>
+    <div class="main-content">
+      <div class="sidebar">
+        <div class="upload-section" id="uploadSection">
+          <input type="file" id="fileInput" accept=".pdf,.txt,.docx,.md,.csv,.json" multiple/>
+          <label for="fileInput" class="upload-label">
+            📁 Click to upload or drag & drop files
+            <small>Supported: PDF, TXT, DOCX, MD, CSV, JSON</small>
+          </label>
+        </div>
+        <div class="rag-info">
+          <h3>RAG Status</h3>
+          <div class="rag-status">
+            <span class="status-dot" style="background:#4ade80"></span>
+            <span id="ragStatus">Ready for document queries</span>
+          </div>
+        </div>
+        <div class="news-config">
+          <h3>📰 News Search</h3>
+          <p style="font-size:0.8rem;opacity:0.8;margin-bottom:10px;">Ask about current events, latest news, or specific topics</p>
+          <div class="news-controls">
+            <button class="news-btn active" data-category="general">General</button>
+            <button class="news-btn" data-category="technology">Tech</button>
+            <button class="news-btn" data-category="business">Business</button>
+            <button class="news-btn" data-category="sports">Sports</button>
+          </div>
+          <div class="news-status" id="newsStatus">Ready for news queries</div>
+        </div>
+        <div class="document-list">
+          <h3>📄 Documents</h3>
+          <div id="documentList"><div style="font-size:0.8rem;opacity:0.7;padding:10px;text-align:center;">No documents uploaded yet</div></div>
+        </div>
+      </div>
+      <div class="chat-area">
+        <div class="messages" id="messages">
+          <div class="message system-message">Welcome! Upload documents, ask about current affairs, or chat normally. 📄📰💬</div>
+        </div>
+        <div class="input-area">
+          <input type="text" id="userInput" class="input-field" placeholder="Ask about documents, current news, or chat normally…" autocomplete="off"/>
+          <button class="send-btn" id="sendBtn">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const NEWS_API_KEY = 'a41ec1968ce048f3ae053589f45be8da';
+    let documents = [], ragEnabled=true, isProcessing=false, streamingEnabled=true, currentNewsCategory='general';
+    if(typeof pdfjsLib!=="undefined")pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    const $=id=>document.getElementById(id), validFile=f=>['.pdf','.txt','.docx','.md','.csv','.json'].some(ext=>f.name.toLowerCase().endsWith(ext)), genId=_=>'doc_'+Date.now()+'_'+Math.random().toString(36).substr(2,8);
+    function escapeHtml(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML;}
+    function addMsg(html,cls){const d=document.createElement('div');d.className=`message ${cls}`;d.innerHTML=html;$('messages').appendChild(d);$('messages').scrollTop=$('messages').scrollHeight;}
+    const userMsg=m=>addMsg(escapeHtml(m),'user-message'), sysMsg=m=>addMsg(m,'system-message');
+    function aiMsg(m,ctx=false,isNews=false){const ind=isNews?'NEWS':'DOC';const css=isNews?'news-indicator':'context-indicator';addMsg(ctx?`${m}<div class="${css}">${ind}</div>`:m,`ai-message${ctx?' message-with-context':''}`);}
+    function showLoad(){const d=document.createElement('div');d.className='message ai-message';d.innerHTML='<div class="loading"><span>AI is thinking</span><div class="loading-dots"><div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div></div></div>';$('messages').appendChild(d);$('messages').scrollTop=$('messages').scrollHeight;return d;}
+    function hideLoad(el){if(el)el.remove();}
+    function refreshDocs(){const c=$('documentList');if(documents.length===0){c.innerHTML='<div style="font-size:0.8rem;opacity:0.7;padding:10px;text-align:center;">No documents uploaded yet</div>';return;}c.innerHTML=documents.map(d=>`<div class="document-item"><span title="${d.name}">${d.name.length>20?d.name.substring(0,20)+'...':d.name}</span><span class="document-status ${d.status}">${d.status.toUpperCase()}</span></div>`).join('');}
+    function setStatus(t){var e=$('ragStatus');if(e)e.textContent=t;}
+    function isNewsQuery(q){const kws=['news','latest','current','today','recent','breaking','headlines','update','affairs'];const L=q.toLowerCase();return kws.some(k=>L.includes(k))||/^tell me about/i.test(L)||/^latest on/i.test(L);}
+    function extractNewsSearchTerm(q){return q.replace(/^(news|latest|current|today|recent|breaking|headlines|update|tell me about|latest on)\s+/i,'').trim();}
+    async function fetchRealNews(term=''){const base='https://newsapi.org/v2/';const endpoint=term?`everything?q=${encodeURIComponent(term)}&language=en&sortBy=publishedAt`:'top-headlines?country=us';const resp=await fetch(`${base}${endpoint}&apiKey=${NEWS_API_KEY}`);if(!resp.ok)throw new Error(resp.statusText);const data=await resp.json();if(data.status!=='ok')throw new Error(data.message);return data.articles;}
+    function formatNewsResponse(arts,q=''){if(!arts||arts.length===0)return 'No news found.';const hdr=q?`📣 Latest on "${q}":`:'📣 Top headlines:';let out=`**${hdr}**\n\n`;arts.slice(0,5).forEach((a,i)=>{const dt=new Date(a.publishedAt).toLocaleDateString();out+=`**${i+1}. ${a.title}**\n*${a.source.name} – ${dt}*\n${a.description||''}\n\n---\n\n`;});return out;}
+    async function processFiles(files){const valid=Array.from(files).filter(validFile);if(valid.length===0){sysMsg('❌ No valid files selected.');return;}for(const f of valid){const doc={id:genId(),name:f.name,status:'processing',chunks:[],content:'',rows:[]};documents.push(doc);refreshDocs();setStatus(`Processing ${f.name}…`);try{let text='';const name=f.name.toLowerCase();if(name.endsWith('.pdf')){const buf=await f.arrayBuffer();const pdf=await pdfjsLib.getDocument({data:buf}).promise;for(let p=1;p<=pdf.numPages;p++){const page=await pdf.getPage(p);const txt=await page.getTextContent();text+=txt.items.map(i=>i.str).join(' ')+'\n'} }else if(name.endsWith('.docx')){const buf=await f.arrayBuffer();const res=await mammoth.extractRawText({arrayBuffer:buf});text=res.value;}else if(name.endsWith('.csv')){await new Promise((res,rej)=>{Papa.parse(f,{header:true,skipEmptyLines:true,complete:r=>{doc.rows=r.data;res(JSON.stringify(r.data,null,2));},error:e=>rej(e)});});}else{text=await f.text();}doc.content=text; if(!name.endsWith('.csv'))doc.chunks=text?chunk(text):[];doc.status='processed';refreshDocs();setStatus(`${documents.filter(d=>d.status==='processed').length} documents ready`);sysMsg(`✅ Document "${f.name}" processed!`);}catch(err){console.error(err);doc.status='error';refreshDocs();sysMsg(`❌ Error processing "${f.name}": ${err.message}`);} }}
+    function chunk(txt,size=500){if(!txt.trim())return[];const s=txt.replace(/\s+/g,' ').split(/[.!?]+/).filter(x=>x.trim());const out=[];let cur='';for(const sen of s){if(cur.length+sen.length>size&&cur){out.push(cur.trim());cur=sen+'. ';}else cur+=sen+'. ';}if(cur.trim())out.push(cur.trim());return out;}
+    function csvInsights(q,doc){if(!doc.rows||!doc.rows.length)return; if(/how many.+rows|total rows/.test(q)){return `The file **${doc.name}** has **${doc.rows.length} rows**.`;} if(/columns|headers/.test(q)){return `Columns in **${doc.name}**:\n• ${Object.keys(doc.rows[0]||{}).join('\n• ')}`;} if(/first.*rows?/.test(q)){const sample=doc.rows.slice(0,3);return `Here are the first 3 rows of **${doc.name}**:\n\`\`\`json\n${JSON.stringify(sample,null,2)}\n\`\`\``;} }
+    async function searchChunks(q){const res=[];const L=q.toLowerCase();for(const d of documents.filter(x=>x.status==='processed'&&x.chunks.length))for(const c of d.chunks){let score=0;for(const w of L.split(/\s+/).filter(w=>w.length>2)){score+=(c.toLowerCase().match(new RegExp(w,'g'))||[]).length;}if(score)res.push({chunk:c,score,source:d.name});}return res.sort((a,b)=>b.score-a.score).slice(0,3).map(r=>({text:r.chunk,source:r.source}));}
+    function docResponse(q,ctxs){let out=`Based on the uploaded documents, here's what I found:\n\n`;ctxs.forEach((c,i)=>{out+=`**From ${c.source}:**\n${c.text}\n\n`;if(i<ctxs.length-1)out+='---\n\n';});return out;}
+    async function generalAnswer(q){await new Promise(r=>setTimeout(r,300));return `Sorry, I don't know that.`;}
+    async function generateAnswer(q){if(isNewsQuery(q)){try{const term=extractNewsSearchTerm(q);const arts=await fetchRealNews(term);return{ text:formatNewsResponse(arts,term),ctx:true,isNews:true};}catch(e){return{ text:`Unable to fetch news: ${e.message}`,ctx:false,isNews:false};}} if(ragEnabled){for(const d of documents.filter(x=>x.status==='processed'&&x.rows?.length)){const ans=csvInsights(q.toLowerCase(),d);if(ans)return{ text:ans,ctx:true,isNews:false};}const ctxs=await searchChunks(q);if(ctxs.length)return{ text:docResponse(q,ctxs),ctx:true,isNews:false};}return{ text:await generalAnswer(q),ctx:false,isNews:false }; }
+    async function sendMessage(){const inp=$('userInput'),txt=inp.value.trim(); if(!txt||isProcessing)return;isProcessing=true;inp.value='';$('sendBtn').disabled=true;userMsg(txt);const loader=showLoad();try{const ans=await generateAnswer(txt);hideLoad(loader);aiMsg(ans.text,ans.ctx,ans.isNews);}catch(e){hideLoad(loader);aiMsg(`Error: ${e.message}`);}isProcessing=false;$('sendBtn').disabled=false;inp.focus();}
+    function handleKeyPress(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}}
+    document.addEventListener('DOMContentLoaded',()=>{
+      $('fileInput').addEventListener('change',e=>processFiles(e.target.files));
+      const up=$('uploadSection');up.addEventListener('dragover',e=>{e.preventDefault();up.classList.add('dragover');});
+      up.addEventListener('dragleave',e=>{e.preventDefault();up.classList.remove('dragover');});
+      up.addEventListener('drop',e=>{e.preventDefault();up.classList.remove('dragover');if(e.dataTransfer.files.length)processFiles(e.dataTransfer.files);});
+      $('sendBtn').addEventListener('click',sendMessage);
+      $('userInput').addEventListener('keypress',handleKeyPress);
+      $('clearChatBtn').addEventListener('click',()=>{$('messages').innerHTML='<div class="message system-message">Chat cleared! Upload documents, ask about current affairs, or chat normally. 📄📰💬</div>';});
+      $('downloadBtn').addEventListener('click',()=>{
+        const msgs=Array.from($('messages').children);const content=msgs.map(m=>{const t=m.textContent.trim();return m.className.includes('user-message')?`User: ${t}`:m.className.includes('ai-message')?`AI: ${t}`:m.className.includes('system-message')?`System: ${t}`:t;}).join('\n\n');
+        const blob=new Blob([content],{type:'text/plain'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='chat_history.txt';a.click();URL.revokeObjectURL(url);
+      });
+      $('streamToggle').addEventListener('click',function(){streamingEnabled=!streamingEnabled;this.textContent=`🎯 Streaming: ${streamingEnabled?'ON':'OFF'}`;this.classList.toggle('active',streamingEnabled);});
+      $('ragToggle').addEventListener('click',function(){ragEnabled=!ragEnabled;this.textContent=`📄 RAG: ${ragEnabled?'ON':'OFF'}`;this.classList.toggle('active',ragEnabled);setStatus(ragEnabled?'RAG enabled':'RAG disabled');});
+      $('mcpToolsBtn').addEventListener('click',()=>sysMsg('🛠️ MCP Tools: Additional features here.'));
+      $('newsHelpBtn').addEventListener('click',()=>sysMsg('📰 News Help: Ask using “news”, “latest”, “headlines”, “tell me about [topic]”'));
+      document.querySelectorAll('.news-btn').forEach(btn=>btn.addEventListener('click',()=>{
+        currentNewsCategory=btn.dataset.category;
+        document.querySelectorAll('.news-btn').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        $('newsStatus').textContent=`Ready for ${currentNewsCategory} news queries`;
+      }));
+      refreshDocs();$('userInput').focus();
+    });
+  </script>
+</body>
+</html>
