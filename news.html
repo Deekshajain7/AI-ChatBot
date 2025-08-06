@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Chatbot – Document Processing, RAG & Current Affairs</title>
+
+<!-- ─────────── LIBRARIES ─────────── -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.21/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+<!-- ─────────── STYLES ─────────── -->
+<style>
+/* ---------- GLOBAL ---------- */
+*,*:before,*:after{box-sizing:border-box;margin:0;padding:0}
+body{
+    font-family:Arial,Helvetica,sans-serif;
+    background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+    color:#fff;
+    height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+.chatbot-container{
+    width:95%;
+    max-width:1200px;
+    height:92vh;
+    background:rgba(255,255,255,.1);
+    backdrop-filter:blur(10px);
+    border-radius:20px;
+    border:1px solid rgba(255,255,255,.15);
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+}
+
+/* ---------- HEADER ---------- */
+.header{
+    background:linear-gradient(135deg,#4facfe 0%,#00f2fe 100%);
+    padding:15px 25px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:10px;
+}
+.header h1{
+    font-size:2rem;
+    font-weight:700;
+    display:flex;
+    align-items:center;
+    gap:8px;
+}
+.status-indicator{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    background:rgba(255,255,255,.25);
+    padding:6px 14px;
+    border-radius:18px;
+    font-size:.9rem;
+}
+.status-dot{
+    width:10px;
+    height:10px;
+    border-radius:50%;
+    background:#4ade80;
+    animation:pulse 2s infinite;
+}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.controls{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+}
+.control-btn{
+    background:rgba(255,255,255,.2);
+    color:#fff;
+    border:none;
+    padding:8px 16px;
+    border-radius:10px;
+    cursor:pointer;
+    font-size:.85rem;
+    transition:.25s;
+    user-select:none;
+}
+.control-btn:hover{background:rgba(255,255,255,.35);transform:translateY(-2px)}
+.control-btn.active{background:#4ade80;color:#fff}
+
+/* ---------- MAIN LAYOUT ---------- */
+.main-content{flex:1;display:flex;overflow:hidden}
+.sidebar{
+    width:320px;
+    background:rgba(255,255,255,.08);
+    border-right:1px solid rgba(255,255,255,.12);
+    padding:20px;
+    overflow-y:auto;
+}
+.upload-section{
+    background:rgba(255,255,255,.12);
+    border:2px dashed rgba(255,255,255,.3);
+    padding:20px;
+    border-radius:12px;
+    text-align:center;
+    cursor:pointer;
+    transition:.25s;
+    position:relative;
+}
+.upload-section:hover{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.5)}
+.upload-section.dragover{background:rgba(255,255,255,.25);border-color:#4ade80}
+.upload-section input{display:none}
+.upload-label{cursor:pointer;display:block;width:100%;height:100%}
+.upload-label small{display:block;margin-top:8px;font-size:.8rem;opacity:.8}
+.rag-info,.document-list,.news-config{margin-top:25px}
+.document-item{
+    background:rgba(255,255,255,.12);
+    padding:8px 12px;
+    margin-bottom:6px;
+    border-radius:8px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-size:.85rem;
+}
+.document-status{
+    font-size:.7rem;
+    padding:2px 8px;
+    border-radius:10px;
+    font-weight:600;
+}
+.processed{background:#4ade80;color:#fff}
+.processing{background:#fbbf24;color:#fff}
+.error{background:#ef4444;color:#fff}
+
+/* ---------- NEWS CONFIG ---------- */
+.news-config{
+    background:rgba(255,255,255,.12);
+    padding:15px;
+    border-radius:12px;
+}
+.news-config h3{
+    margin-bottom:10px;
+    font-size:1.1rem;
+}
+.api-input{
+    width:100%;
+    padding:8px 12px;
+    border:none;
+    border-radius:6px;
+    background:rgba(255,255,255,.2);
+    color:#fff;
+    font-size:.9rem;
+    margin-bottom:10px;
+}
+.api-input::placeholder{color:rgba(255,255,255,.7)}
+.api-input:focus{outline:none;background:rgba(255,255,255,.3)}
+.news-controls{
+    display:flex;
+    gap:8px;
+    margin-bottom:10px;
+    flex-wrap:wrap;
+}
+.news-btn{
+    padding:6px 12px;
+    border:none;
+    border-radius:6px;
+    background:rgba(255,255,255,.2);
+    color:#fff;
+    cursor:pointer;
+    font-size:.8rem;
+    transition:.25s;
+    user-select:none;
+}
+.news-btn:hover{background:rgba(255,255,255,.35);transform:translateY(-1px)}
+.news-btn.active{background:#4ade80;color:#fff}
+.news-status{
+    font-size:.8rem;
+    padding:4px 8px;
+    border-radius:6px;
+    background:rgba(255,255,255,.15);
+}
+
+/* ---------- CHAT ---------- */
+.chat-area{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.messages{
+    flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px;
+}
+.message{
+    max-width:80%;
+    padding:14px 18px;
+    border-radius:18px;
+    font-size:.93rem;
+    line-height:1.4;
+    animation:slideIn .3s ease;
+    word-wrap:break-word;
+}
+@keyframes slideIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.user-message{
+    background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+    align-self:flex-end;
+    color:#fff;
+}
+.ai-message{
+    background:rgba(255,255,255,.15);
+    border:1px solid rgba(255,255,255,.25);
+    align-self:flex-start;
+    color:#fff;
+}
+.system-message{
+    background:rgba(34,197,94,.2);
+    color:#4ade80;
+    align-self:center;
+    font-size:.8rem;
+}
+.message-with-context{position:relative}
+.context-indicator{
+    position:absolute;
+    top:-8px;right:-8px;
+    background:#4ade80;
+    color:#fff;
+    font-size:.7rem;
+    padding:2px 6px;
+    border-radius:10px;
+    font-weight:700;
+}
+.news-indicator{
+    background:#ff6b6b;
+}
+
+/* ---------- INPUT ---------- */
+.input-area{
+    display:flex;
+    gap:10px;
+    padding:18px 20px;
+    background:rgba(255,255,255,.08);
+    border-top:1px solid rgba(255,255,255,.12);
+}
+.input-field{
+    flex:1;
+    padding:14px 18px;
+    border:none;
+    border-radius:25px;
+    background:rgba(255,255,255,.15);
+    color:#fff;
+    font-size:1rem;
+}
+.input-field::placeholder{color:rgba(255,255,255,.7)}
+.input-field:focus{outline:none;box-shadow:0 0 0 2px rgba(79,172,254,.5)}
+.send-btn{
+    background:linear-gradient(135deg,#4facfe 0%,#00f2fe 100%);
+    border:none;
+    border-radius:25px;
+    color:#fff;
+    font-weight:600;
+    padding:14px 22px;
+    cursor:pointer;
+    transition:.25s;
+    user-select:none;
+}
+.send-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 4px 12px rgba(79,172,254,.4)}
+.send-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+/* ---------- LOADING ---------- */
+.loading{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    color:rgba(255,255,255,.85);
+}
+.loading-dots{display:flex;gap:4px}
+.loading-dot{
+    width:6px;height:6px;border-radius:50%;background:#fff;
+    animation:bounce 1.4s infinite ease-in-out;
+}
+.loading-dot:nth-child(1){animation-delay:-.32s}
+.loading-dot:nth-child(2){animation-delay:-.16s}
+@keyframes bounce{0%,80%,100%{transform:scale(0)}40%{transform:scale(1)}}
+
+/* ---------- RESPONSIVE ---------- */
+@media(max-width:768px){
+    .chatbot-container{height:95vh}
+    .main-content{flex-direction:column}
+    .sidebar{width:100%;height:280px;border-right:none;border-bottom:1px solid rgba(255,255,255,.12)}
+    .news-controls{flex-wrap:wrap}
+    .controls{justify-content:center}
+    .header{flex-direction:column;gap:15px}
+}
+</style>
+</head>
+<body>
+<div class="chatbot-container">
+
+<!-- ─────────── HEADER ─────────── -->
+<div class="header">
+    <h1>🤖 AI Chatbot</h1>
+    <div class="status-indicator">
+        <div class="status-dot"></div>
+        <span id="statusText">Ready – Document Processing & News</span>
+    </div>
+    <div class="controls">
+        <button class="control-btn" id="clearChatBtn">🗑️ Clear Chat</button>
+        <button class="control-btn" id="downloadBtn">📥 Download</button>
+        <button class="control-btn active" id="streamToggle">🎯 Streaming: ON</button>
+        <button class="control-btn active" id="ragToggle">📄 RAG: ON</button>
+        <button class="control-btn" id="mcpToolsBtn">🛠️ MCP Tools</button>
+        <button class="control-btn" id="newsHelpBtn">📰 News Help</button>
+    </div>
+</div>
+
+<!-- ─────────── MAIN ─────────── -->
+<div class="main-content">
+
+    <!-- ─────────── SIDEBAR ─────────── -->
+    <div class="sidebar">
+        <div class="upload-section" id="uploadSection">
+            <input type="file" id="fileInput" accept=".pdf,.txt,.docx,.md,.csv,.json" multiple />
+            <label for="fileInput" class="upload-label">
+                📁 Click to upload or drag & drop files
+                <small>Supported: PDF, TXT, DOCX, MD, CSV, JSON</small>
+            </label>
+        </div>
+
+        <div class="rag-info">
+            <h3>RAG Status</h3>
+            <div class="rag-status">
+                <span class="status-dot" style="background:#4ade80"></span>
+                <span id="ragStatus">Ready for document queries</span>
+            </div>
+        </div>
+
+        <div class="news-config">
+            <h3>📰 News Search</h3>
+            <p style="font-size:0.8rem;opacity:0.8;margin-bottom:10px;">
+                Ask about current events, latest news, or specific topics
+            </p>
+            <div class="news-controls">
+                <button class="news-btn active" data-category="general">General</button>
+                <button class="news-btn" data-category="technology">Tech</button>
+                <button class="news-btn" data-category="business">Business</button>
+                <button class="news-btn" data-category="sports">Sports</button>
+            </div>
+            <div class="news-status" id="newsStatus">Ready for news queries</div>
+        </div>
+
+        <div class="document-list">
+            <h3>📄 Documents</h3>
+            <div id="documentList">
+                <div style="font-size:0.8rem;opacity:0.7;padding:10px;text-align:center;">
+                    No documents uploaded yet
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─────────── CHAT AREA ─────────── -->
+    <div class="chat-area">
+        <div class="messages" id="messages">
+            <div class="message system-message">
+                Welcome! Upload documents, ask about current affairs, or chat normally. 📄📰💬
+            </div>
+        </div>
+
+        <div class="input-area">
+            <input type="text" id="userInput" class="input-field"
+                   placeholder="Ask about documents, current news, or chat normally…" autocomplete="off">
+            <button class="send-btn" id="sendBtn">Send</button>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- ─────────── SCRIPT ─────────── -->
+<script>
+/* ---------- GLOBALS ---------- */
+let documents = [];
+let ragEnabled = true;
+let isProcessing = false;
+let streamingEnabled = true;
+let currentNewsCategory = 'general';
+
+// Initialize PDF.js worker
+if (typeof pdfjsLib !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+}
+
+/* ---------- UTILITY FUNCTIONS ---------- */
+const $ = id => document.getElementById(id);
+const validFile = f => ['.pdf','.txt','.docx','.md','.csv','.json'].some(ext => f.name.toLowerCase().endsWith(ext));
+const genId = () => 'doc_'+Date.now()+'_'+Math.random().toString(36).substr(2,8);
+
+/* ---------- UI HELPERS ---------- */
+const refreshDocs = () => {
+    const container = $('documentList');
+    if (documents.length === 0) {
+        container.innerHTML = '<div style="font-size:0.8rem;opacity:0.7;padding:10px;text-align:center;">No documents uploaded yet</div>';
+        return;
+    }
+    
+    container.innerHTML = documents.map(d=>
+        `<div class="document-item">
+            <span title="${d.name}">${d.name.length > 20 ? d.name.substring(0,20)+'...' : d.name}</span>
+            <span class="document-status ${d.status}">${d.status.toUpperCase()}</span>
+         </div>`).join('');
+};
+
+const setStatus = t => {
+    const statusEl = $('ragStatus');
+    if (statusEl) statusEl.textContent = t;
+};
+
+const addMsg = (m, cls) => {
+    const div = document.createElement('div');
+    div.className = `message ${cls}`;
+    div.innerHTML = m;
+    $('messages').appendChild(div);
+    $('messages').scrollTop = $('messages').scrollHeight;
+};
+
+const userMsg = m => addMsg(escapeHtml(m), 'user-message');
+const aiMsg = (m, ctx = false, isNews = false) => {
+    const indicator = isNews ? 'NEWS' : 'DOC';
+    const indicatorClass = isNews ? 'news-indicator' : 'context-indicator';
+    addMsg(
+        ctx ? `${m}<div class="${indicatorClass}">${indicator}</div>` : m,
+        `ai-message${ctx ? ' message-with-context' : ''}`
+    );
+};
+const sysMsg = m => addMsg(m, 'system-message');
+
+const escapeHtml = (text) => {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+};
+
+const showLoad = () => {
+    const div = document.createElement('div');
+    div.className = 'message ai-message';
+    div.innerHTML = '<div class="loading"><span>AI is thinking</span><div class="loading-dots"><div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div></div></div>';
+    $('messages').appendChild(div);
+    $('messages').scrollTop = $('messages').scrollHeight;
+    return div;
+};
+
+const hideLoad = el => el && el.remove();
+
+/* ---------- NEWS FUNCTIONS ---------- */
+function updateNewsStatus() {
+    const status = $('newsStatus');
+    if (status) {
+        status.textContent = `Ready for ${currentNewsCategory} news queries`;
+        status.style.background = 'rgba(74, 222, 128, 0.3)';
+    }
+}
+
+function setNewsCategory(category) {
+    currentNewsCategory = category;
+    
+    // Update button states
+    document.querySelectorAll('.news-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.category === category) {
+            btn.classList.add('active');
+        }
+    });
+    
+    updateNewsStatus();
+}
+
+function isNewsQuery(query) {
+    const newsKeywords = [
+        'news', 'latest', 'current', 'today', 'recent', 'breaking',
+        'headlines', 'update', 'affairs', 'happening', 'events',
+        'politics', 'election', 'government', 'economy', 'market',
+        'covid', 'pandemic', 'weather', 'sports', 'technology',
+        'business', 'entertainment', 'health', 'science', 'world'
+    ];
+    
+    const queryLower = query.toLowerCase();
+    return newsKeywords.some(keyword => queryLower.includes(keyword)) ||
+           queryLower.includes('what\'s happening') ||
+           queryLower.includes('tell me about') ||
+           queryLower.startsWith('latest on') ||
+           queryLower.includes('current affairs');
+}
+
+async function fetchSimulatedNews(query = '') {
+    // Simulate news fetching with realistic data
+    const newsArticles = [
+        {
+            title: "AI Technology Breakthrough in Healthcare",
+            description: "New AI system shows promising results in early disease detection, potentially revolutionizing medical diagnostics.",
+            source: { name: "Tech Daily" },
+            publishedAt: new Date().toISOString(),
+            url: "https://example.com/ai-healthcare"
+        },
+        {
+            title: "Global Climate Summit Reaches New Agreement",
+            description: "World leaders announce ambitious new targets for carbon reduction and renewable energy adoption.",
+            source: { name: "Environmental News" },
+            publishedAt: new Date(Date.now() - 86400000).toISOString(),
+            url: "https://example.com/climate-summit"
+        },
+        {
+            title: "Tech Giants Report Strong Q4 Earnings",
+            description: "Major technology companies exceed expectations with robust financial results driven by AI investments.",
+            source: { name: "Financial Times" },
+            publishedAt: new Date(Date.now() - 172800000).toISOString(),
+            url: "https://example.com/tech-earnings"
+        }
+    ];
+
+    // Filter based on category and query
+    let filteredArticles = newsArticles;
+    
+    if (query) {
+        filteredArticles = newsArticles.filter(article => 
+            article.title.toLowerCase().includes(query.toLowerCase()) ||
+            article.description.toLowerCase().includes(query.toLowerCase())
+        );
+    }
+    
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    return filteredArticles;
+}
+
+function formatNewsResponse(articles, query = '') {
+    if (!articles || articles.length === 0) {
+        return 'No news articles found for your query. Try different keywords or check back later.';
+    }
+
+    const title = query ? `Latest news about "${query}"` : `Latest ${currentNewsCategory} news`;
+    let response = `**${title}:**\n\n`;
+
+    articles.slice(0, 5).forEach((article, index) => {
+        response += `**${index + 1}. ${article.title}**\n`;
+        response += `*${article.source.name} - ${new Date(article.publishedAt).toLocaleDateString()}*\n`;
+        if (article.description) {
+            response += `${article.description}\n`;
+        }
+        response += '\n---\n\n';
+    });
+
+    response += '*Note: This is a demo version. For real news, integrate with a news API service.*';
+    return response;
+}
+
+/* ---------- FILE HANDLING ---------- */
+async function processFiles(files) {
+    const validFiles = Array.from(files).filter(validFile);
+    if (validFiles.length === 0) {
+        sysMsg('❌ No valid files selected. Please upload PDF, TXT, DOCX, MD, CSV, or JSON files.');
+        return;
+    }
+
+    for (const f of validFiles) {
+        const doc = {id: genId(), name: f.name, status: 'processing', chunks: [], content: '', rows: []};
+        documents.push(doc);
+        refreshDocs();
+        
+        try {
+            setStatus(`Processing ${f.name}…`);
+            const text = await extractText(f, doc);
+            doc.content = text;
+            if (!f.name.toLowerCase().endsWith('.csv')) {
+                doc.chunks = chunk(text);
+            }
+            doc.status = 'processed';
+            refreshDocs();
+            setStatus(`${documents.filter(d => d.status === 'processed').length} documents ready`);
+            sysMsg(`✅ Document "${f.name}" processed successfully!`);
+        } catch (err) {
+            console.error('File processing error:', err);
+            doc.status = 'error';
+            refreshDocs();
+            sysMsg(`❌ Error processing "${f.name}": ${err.message}`);
+        }
+    }
+}
+
+async function extractText(file, doc) {
+    const name = file.name.toLowerCase();
+    
+    if (name.endsWith('.pdf')) {
+        if (typeof pdfjsLib === 'undefined') {
+            throw new Error('PDF.js not loaded');
+        }
+        
+        const buf = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+        let text = '';
+        for (let p = 1; p <= pdf.numPages; p++) {
+            const page = await pdf.getPage(p);
+            const textContent = await page.getTextContent();
+            text += textContent.items.map(i => i.str).join(' ') + '\n';
+        }
+        return text;
+    }
+    
+    if (name.endsWith('.docx')) {
+        if (typeof mammoth === 'undefined') {
+            throw new Error('Mammoth not loaded');
+        }
+        
+        const buf = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({arrayBuffer: buf});
+        return result.value;
+    }
+    
+    if (name.endsWith('.csv')) {
+        return new Promise((resolve, reject) => {
+            if (typeof Papa === 'undefined') {
+                reject(new Error('PapaParse not loaded'));
+                return;
+            }
+            
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: result => {
+                    if (result.errors.length > 0) {
+                        console.warn('CSV parsing warnings:', result.errors);
+                    }
+                    doc.rows = result.data;
+                    resolve(JSON.stringify(result.data, null, 2));
+                },
+                error: error => reject(new Error(`CSV parsing error: ${error.message}`))
+            });
+        });
+    }
+    
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => {
+            let content = e.target.result;
+            if (name.endsWith('.json')) {
+                try {
+                    const parsed = JSON.parse(content);
+                    content = JSON.stringify(parsed, null, 2);
+                } catch (e) {
+                    // Keep original content if JSON parsing fails
+                }
+            }
+            resolve(content);
+        };
+        reader.onerror = () => reject(new Error('File reading failed'));
+        reader.readAsText(file);
+    });
+}
+
+/* ---------- TEXT CHUNKING ---------- */
+const chunk = (txt, size = 500) => {
+    if (!txt || txt.trim().length === 0) return [];
+    
+    const sentences = txt.replace(/\s+/g, ' ')
+                        .split(/[.!?]+/)
+                        .filter(s => s.trim().length > 0);
+    
+    if (sentences.length === 0) return [txt];
+    
+    let current = '', output = [];
+    
+    for (const sentence of sentences) {
+        if (current.length + sentence.length > size && current.trim()) {
+            output.push(current.trim());
+            current = sentence;
+        } else {
+            current += sentence + '. ';
+        }
+    }
+    
+    if (current.trim()) {
+        output.push(current.trim());
+    }
+    
+    return output;
+};
+
+/* ---------- CHAT FUNCTIONS ---------- */
+function handleKeyPress(event) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
+    }
+}
+
+async function sendMessage() {
+    const userInput = $('userInput');
+    const sendBtn = $('sendBtn');
+    const txt = userInput.value.trim();
+    
+    if (!txt || isProcessing) return;
+    
+    isProcessing = true;
+    userInput.value = '';
+    sendBtn.disabled = true;
+    
+    userMsg(txt);
+    
+    const loader = showLoad();
+    
+    try {
+        const response = await generateAnswer(txt);
+        hideLoad(loader);
+        aiMsg(response.text, response.ctx, response.isNews);
+    } catch (error) {
+        console.error('Answer generation error:', error);
+        hideLoad(loader);
+        aiMsg(`Sorry, something went wrong: ${error.message}`);
+    }
+    
+    isProcessing = false;
+    sendBtn.disabled = false;
+    userInput.focus();
+}
+
+/* ---------- ANSWER GENERATION ---------- */
+async function generateAnswer(q) {
+    // Check if it's a news query first
+    if (isNewsQuery(q)) {
+        try {
+            const searchTerm = extractNewsSearchTerm(q);
+            const articles = await fetchSimulatedNews(searchTerm);
+            return {
+                text: formatNewsResponse(articles, searchTerm),
+                ctx: true,
+                isNews: true
+            };
+        } catch (error) {
+            console.error('News fetch error:', error);
+            return {
+                text: `Unable to fetch news: ${error.message}`,
+                ctx: false,
+                isNews: false
+            };
+        }
+    }
+
+    // CSV queries
+    if (ragEnabled) {
+        for (const d of documents.filter(x => x.status === 'processed' && x.rows.length)) {
+            const csvAns = csvInsights(q.toLowerCase(), d);
+            if (csvAns) return {text: csvAns, ctx: true, isNews: false};
+        }
+        
+        // Text-RAG
+        const ctx = await searchChunks(q);
+        if (ctx.length) return {text: docResponse(q, ctx), ctx: true, isNews: false};
+    }
+    
+    // General answer
+    return {text: await generalAnswer(q), ctx: false, isNews: false};
+}
+
+function extractNewsSearchTerm(query) {
+    const patterns = [
+        /news about (.+)/i,
+        /latest on (.+)/i,
+        /tell me about (.+)/i,
+        /what.*happening.*with (.+)/i,
+        /updates? on (.+)/i,
+        /current affairs about (.+)/i
+    ];
+    
+    for (const pattern of patterns) {
+        const match = query.match(pattern);
+        if (match) {
+            return match[1].trim();
+        }
+    }
+    
+    const cleanQuery = query.toLowerCase()
+        .replace(/\b(news|latest|current|today|recent|breaking|headlines|update|affairs|happening|events|tell me about|what's|whats|current affairs)\b/g, '')
+        .trim();
+    
+    return cleanQuery || '';
+}
+
+function csvInsights(q, doc) {
+    if (!doc.rows || doc.rows.length === 0) return null;
+    
+    if (/how many.+students?|total\s+rows|row\s+count|how many records?/.test(q)) {
+        return `The file **${doc.name}** contains **${doc.rows.length} rows** (each row represents a record).`;
+    }
+    if (/column|header|field\s+names/.test(q)) {
+        const headers = Object.keys(doc.rows[0] || {});
+        return `Columns in **${doc.name}**:\n• ${headers.join('\n• ')}`;
+    }
+    if (/sample|show.*rows|first.*rows?/.test(q)) {
+        const sample = doc.rows.slice(0, 3);
+        return `Here are the first 3 rows of **${doc.name}**:\n\`\`\`json\n${JSON.stringify(sample, null, 2)}\n\`\`\``;
+    }
+    return null;
+}
+
+/* ---------- CHUNK SEARCH ---------- */
+async function searchChunks(query) {
+    const results = [];
+    const queryLower = query.toLowerCase();
+    
+    for (const doc of documents.filter(d => d.status === 'processed' && d.chunks.length)) {
+        for (const chunk of doc.chunks) {
+            const chunkLower = chunk.toLowerCase();
+            let score = 0;
+            
+            // Simple keyword matching
+            const queryWords = queryLower.split(/\s+/).filter(w => w.length > 2);
+            for (const word of queryWords) {
+                const matches = (chunkLower.match(new RegExp(word, 'g')) || []).length;
+                score += matches;
+            }
+            
+            if (score > 0) {
+                results.push({
+                    chunk,
+                    score,
+                    docName: doc.name
+                });
+            }
+        }
+    }
+    
+    // Sort by relevance and return top 3
+    return results
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3)
+        .map(r => ({text: r.chunk, source: r.docName}));
+}
+
+/* ---------- RESPONSE GENERATION ---------- */
+function docResponse(query, contexts) {
+    let response = `Based on the uploaded documents, here's what I found:\n\n`;
+    
+    contexts.forEach((ctx, idx) => {
+        response += `**From ${ctx.source}:**\n`;
+        response += `${ctx.text}\n\n`;
+        if (idx < contexts.length - 1) response += `---\n\n`;
+    });
+    
+    return response;
+}
+
+async function generalAnswer(query) {
+    // Simulate AI response generation
+    const responses = [
+        "I understand your question. Let me help you with that.",
+        "That's an interesting question. Here's my perspective:",
+        "Based on my knowledge, I can provide the following information:",
+        "Let me break this down for you:",
+        "Here's what I can tell you about that:"
+    ];
+    
+    const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+    
+    // Simulate thinking time
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    return `${randomResponse}\n\n${query}\n\nI'm a demo chatbot. For more comprehensive answers, please integrate with a proper AI service like OpenAI, Anthropic, or similar.`;
+}
+
+/* ---------- EVENT LISTENERS ---------- */
+document.addEventListener('DOMContentLoaded', function() {
+    // File upload handling
+    const fileInput = $('fileInput');
+    const uploadSection = $('uploadSection');
+    
+    fileInput.addEventListener('change', e => {
+        if (e.target.files.length > 0) {
+            processFiles(e.target.files);
+        }
+    });
+    
+    // Drag and drop
+    uploadSection.addEventListener('dragover', e => {
+        e.preventDefault();
+        uploadSection.classList.add('dragover');
+    });
+    
+    uploadSection.addEventListener('dragleave', e => {
+        e.preventDefault();
+        uploadSection.classList.remove('dragover');
+    });
+    
+    uploadSection.addEventListener('drop', e => {
+        e.preventDefault();
+        uploadSection.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) {
+            processFiles(e.dataTransfer.files);
+        }
+    });
+    
+    // Chat input
+    const userInput = $('userInput');
+    const sendBtn = $('sendBtn');
+    
+    userInput.addEventListener('keypress', handleKeyPress);
+    sendBtn.addEventListener('click', sendMessage);
+    
+    // Control buttons
+    $('clearChatBtn').addEventListener('click', () => {
+        $('messages').innerHTML = '<div class="message system-message">Chat cleared! Upload documents, ask about current affairs, or chat normally. 📄📰💬</div>';
+    });
+    
+    $('downloadBtn').addEventListener('click', () => {
+        const messages = Array.from($('messages').children);
+        const content = messages.map(msg => {
+            const text = msg.textContent.trim();
+            const className = msg.className;
+            if (className.includes('user-message')) return `User: ${text}`;
+            if (className.includes('ai-message')) return `AI: ${text}`;
+            if (className.includes('system-message')) return `System: ${text}`;
+            return text;
+        }).join('\n\n');
+        
+        const blob = new Blob([content], {type: 'text/plain'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'chat_history.txt';
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+    
+    $('streamToggle').addEventListener('click', function() {
+        streamingEnabled = !streamingEnabled;
+        this.textContent = `🎯 Streaming: ${streamingEnabled ? 'ON' : 'OFF'}`;
+        this.classList.toggle('active', streamingEnabled);
+    });
+    
+    $('ragToggle').addEventListener('click', function() {
+        ragEnabled = !ragEnabled;
+        this.textContent = `📄 RAG: ${ragEnabled ? 'ON' : 'OFF'}`;
+        this.classList.toggle('active', ragEnabled);
+        setStatus(ragEnabled ? 'RAG enabled' : 'RAG disabled');
+    });
+    
+    $('mcpToolsBtn').addEventListener('click', () => {
+        sysMsg('🛠️ MCP Tools: Model Context Protocol tools would integrate here for extended functionality like web search, code execution, etc.');
+    });
+    
+    $('newsHelpBtn').addEventListener('click', () => {
+        sysMsg('📰 News Help: Ask about current events, latest news, or use keywords like "latest", "news", "current affairs", "breaking", etc. Example: "latest tech news" or "current affairs about AI"');
+    });
+    
+    // News category buttons
+    document.querySelectorAll('.news-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            setNewsCategory(btn.dataset.category);
+        });
+    });
+    
+    // Initialize
+    refreshDocs();
+    updateNewsStatus();
+    userInput.focus();
+});
+
+/* ---------- UTILITY FUNCTIONS ---------- */
+function updateStatusIndicator(status) {
+    const statusText = $('statusText');
+    if (statusText) {
+        statusText.textContent = status;
+    }
+}
+
+// Performance monitoring
+let lastActivity = Date.now();
+setInterval(() => {
+    const now = Date.now();
+    if (now - lastActivity > 300000) { // 5 minutes
+        updateStatusIndicator('Idle – Ready when you are');
+    }
+}, 60000);
+
+// Update activity timestamp on user interaction
+document.addEventListener('click', () => {
+    lastActivity = Date.now();
+    updateStatusIndicator('Ready – Document Processing & News');
+});
+
+document.addEventListener('keypress', () => {
+    lastActivity = Date.now();
+    updateStatusIndicator('Ready – Document Processing & News');
+});
+
+// Error handling
+window.addEventListener('error', (e) => {
+    console.error('Global error:', e.error);
+    sysMsg('❌ An error occurred. Please refresh the page if issues persist.');
+});
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+    documents.length = 0;
+});
+</script>
+</body>
+</html>
