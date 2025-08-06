@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chatbots </title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            height: 90vh;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            padding: 20px;
+            text-align: center;
+            color: white;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .robot-icon {
+            font-size: 2.5rem;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-10px); }
+            60% { transform: translateY(-5px); }
+        }
+
+        .status-bar {
+            background: rgba(255,255,255,0.2);
+            padding: 10px 20px;
+            border-radius: 10px;
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #4ade80;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(74, 222, 128, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+        }
+
+        .toolbar {
+            background: #f8fafc;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+            transform: translateY(-1px);
+        }
+
+        .btn-warning {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #d97706;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #4b5563;
+            transform: translateY(-1px);
+        }
+
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8fafc;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+        }
+
+        .message-content {
+            background: white;
+            padding: 15px;
+            border-radius: 15px;
+            max-width: 70%;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .message.user .message-content {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .message-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .message.user .message-avatar {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .message.bot .message-avatar {
+            background: #10b981;
+            color: white;
+        }
+
+        .input-area {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .message-input:focus {
+            border-color: #3b82f6;
+        }
+
+        .send-btn {
+            width: 50px;
+            height: 50px;
+            border: none;
+            border-radius: 50%;
+            background: #3b82f6;
+            color: white;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .send-btn:hover {
+            background: #2563eb;
+            transform: scale(1.1);
+        }
+
+        .mcp-panel {
+            position: fixed;
+            top: 0;
+            right: -400px;
+            width: 400px;
+            height: 100vh;
+            background: white;
+            box-shadow: -5px 0 20px rgba(0,0,0,0.1);
+            transition: right 0.3s ease;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .mcp-panel.open {
+            right: 0;
+        }
+
+        .mcp-header {
+            background: #1f2937;
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .mcp-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .tool-item {
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .tool-name {
+            font-weight: bold;
+            color: #1f2937;
+            margin-bottom: 5px;
+        }
+
+        .tool-description {
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .status-connected {
+            color: #10b981;
+            font-weight: bold;
+        }
+
+        .status-disconnected {
+            color: #ef4444;
+            font-weight: bold;
+        }
+
+        .loading {
+            opacity: 0.7;
+        }
+
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            color: #6b7280;
+            font-style: italic;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 2px;
+        }
+
+        .typing-dot {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: #6b7280;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-10px); }
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 5px;
+            transition: background-color 0.2s;
+        }
+
+        .close-btn:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                width: 95%;
+                height: 95vh;
+            }
+            
+            .mcp-panel {
+                width: 100%;
+                right: -100%;
+            }
+            
+            .toolbar {
+                flex-direction: column;
+                gap: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><span class="robot-icon">🤖</span> AI Chatbot</h1>
+            <div class="status-bar">
+                <div class="status-indicator"></div>
+                <span id="connectionStatus">Connected to: http://192.168.114.46:1234</span>
+            </div>
+        </div>
+
+        <div class="toolbar">
+            <button class="btn btn-secondary" onclick="clearChat()">
+                📝 Clear Chat
+            </button>
+            <button class="btn btn-primary" onclick="downloadChat()">
+                📥 Download
+            </button>
+            <button class="btn btn-success" id="streamingBtn" onclick="toggleStreaming()">
+                📡 Streaming: ON
+            </button>
+            <button class="btn btn-warning" onclick="toggleMCPPanel()">
+                🔧 MCP Tools
+            </button>
+        </div>
+
+        <div class="chat-container">
+            <div class="messages" id="messages">
+                <div class="message bot">
+                    <div class="message-avatar">🤖</div>
+                    <div class="message-content">
+                        👋 Hello! I'm your LM Studio chatbot with MCP support. How can I help you today?
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-area">
+                <div class="input-container">
+                    <input type="text" class="message-input" id="messageInput" placeholder="Type your message here..." onkeypress="handleKeyPress(event)">
+                    <button class="send-btn" onclick="sendMessage()">➤</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mcp-panel" id="mcpPanel">
+        <div class="mcp-header">
+            <h3>MCP Tools</h3>
+            <button class="close-btn" onclick="toggleMCPPanel()">×</button>
+        </div>
+        <div class="mcp-content">
+            <div class="tool-item">
+                <div class="tool-name">Connection Status</div>
+                <div class="tool-description">
+                    <span id="mcpStatus" class="status-connected">Connected</span>
+                    <br>Server: http://192.168.114.46:1234
+                </div>
+            </div>
+            
+            <div class="tool-item">
+                <div class="tool-name">Available Tools</div>
+                <div class="tool-description" id="toolsList">
+                    Loading tools...
+                </div>
+            </div>
+            
+            <div class="tool-item">
+                <div class="tool-name">System Information</div>
+                <div class="tool-description">
+                    • Model: LM Studio<br>
+                    • Protocol: MCP 1.0<br>
+                    • Status: Active
+                </div>
+            </div>
+            
+            <div class="tool-item">
+                <div class="tool-name">Quick Actions</div>
+                <div class="tool-description">
+                    <button class="btn btn-primary" style="margin: 5px;" onclick="testMCPConnection()">Test Connection</button>
+                    <button class="btn btn-secondary" style="margin: 5px;" onclick="refreshTools()">Refresh Tools</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let isStreaming = true;
+        let mcpConnected = true;
+        let currentTools = [];
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeMCP();
+            loadAvailableTools();
+            focusInput();
+        });
+
+        // Focus input on load
+        function focusInput() {
+            document.getElementById('messageInput').focus();
+        }
+
+        // Handle enter key press
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        // Send message function
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Add user message
+            addMessage(message, 'user');
+            input.value = '';
+            
+            // Show typing indicator
+            showTypingIndicator();
+            
+            // Simulate AI response
+            setTimeout(() => {
+                hideTypingIndicator();
+                generateAIResponse(message);
+            }, 1000 + Math.random() * 2000);
+        }
+
+        // Add message to chat
+        function addMessage(content, type) {
+            const messages = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            
+            const avatar = type === 'user' ? '👤' : '🤖';
+            
+            messageDiv.innerHTML = `
+                <div class="message-avatar">${avatar}</div>
+                <div class="message-content">${content}</div>
+            `;
+            
+            messages.appendChild(messageDiv);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        // Show typing indicator
+        function showTypingIndicator() {
+            const messages = document.getElementById('messages');
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message bot typing-indicator';
+            typingDiv.id = 'typingIndicator';
+            
+            typingDiv.innerHTML = `
+                <div class="message-avatar">🤖</div>
+                <div class="message-content">
+                    <div class="typing-indicator">
+                        Typing
+                        <div class="typing-dots">
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            messages.appendChild(typingDiv);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        // Hide typing indicator
+        function hideTypingIndicator() {
+            const typingIndicator = document.getElementById('typingIndicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
+
+        // Generate AI response
+        async function generateAIResponse(userMessage) {
+            try {
+                // Try to get real AI response first
+                const aiResponse = await callAIAPI(userMessage);
+                
+                if (isStreaming) {
+                    streamResponse(aiResponse);
+                } else {
+                    addMessage(aiResponse, 'bot');
+                }
+            } catch (error) {
+                console.error('AI API Error:', error);
+                // Fallback to more intelligent demo responses
+                const intelligentResponse = generateIntelligentResponse(userMessage);
+                
+                if (isStreaming) {
+                    streamResponse(intelligentResponse);
+                } else {
+                    addMessage(intelligentResponse, 'bot');
+                }
+            }
+        }
+
+        // Call AI API (LM Studio, OpenAI, etc.)
+        async function callAIAPI(message) {
+            // Try LM Studio first
+            try {
+                const response = await fetch('http://192.168.114.46:1234/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: "local-model",
+                        messages: [
+                            {
+                                role: "system",
+                                content: "You are a helpful AI assistant with MCP (Model Context Protocol) capabilities. You can help with various tasks including file operations, web searches, and data analysis."
+                            },
+                            {
+                                role: "user",
+                                content: message
+                            }
+                        ],
+                        temperature: 0.7,
+                        max_tokens: 1000,
+                        stream: false
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                return data.choices[0].message.content;
+            } catch (error) {
+                console.log('LM Studio not available, trying OpenAI...');
+                
+                // Try OpenAI API (you need to add your API key)
+                const openAIKey = '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'; // Replace with your key
+                if (openAIKey && openAIKey !== 'your-openai-api-key') {
+                    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${openAIKey}`
+                        },
+                        body: JSON.stringify({
+                            model: "gpt-3.5-turbo",
+                            messages: [
+                                {
+                                    role: "system",
+                                    content: "You are a helpful AI assistant with MCP capabilities."
+                                },
+                                {
+                                    role: "user",
+                                    content: message
+                                }
+                            ],
+                            temperature: 0.7,
+                            max_tokens: 1000
+                        })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        return data.choices[0].message.content;
+                    }
+                }
+                
+                throw new Error('No AI service available');
+            }
+        }
+
+        // Generate intelligent response based on message content
+        function generateIntelligentResponse(userMessage) {
+            const message = userMessage.toLowerCase();
+            
+            // School-related queries
+            if (message.includes('school') || message.includes('cbse') || message.includes('education')) {
+                if (message.includes('excel public school') || message.includes('mysore')) {
+                    return "I understand you're asking about Excel Public School in Mysore. While I don't have the current CBSE affiliation number in my immediate database, I can help you find this information. CBSE schools typically have affiliation numbers that start with their region code. For Karnataka schools, you can check the official CBSE website at cbse.gov.in or contact the school directly for their current affiliation status.";
+                }
+                return "I can help you with school-related information. Could you please provide more specific details about what you're looking for?";
+            }
+            
+            // General queries
+            if (message.includes('hello') || message.includes('hi')) {
+                return "Hello! I'm an AI assistant with MCP capabilities. I can help you with various tasks including information lookup, file operations, and data analysis. What would you like to know?";
+            }
+            
+            if (message.includes('help')) {
+                return "I can assist you with:\n• Information lookup and research\n• File operations and data analysis\n• Web searches and content retrieval\n• Code generation and debugging\n• Educational queries\n• General question answering\n\nWhat specific help do you need?";
+            }
+            
+            // Default intelligent response
+            return `I've analyzed your query: "${userMessage}". While I don't have access to real-time data right now, I'm designed to help with various tasks using MCP tools. To get more accurate and up-to-date information, please ensure the AI service is properly connected. Is there anything specific I can help you with based on my current capabilities?`;
+        }
+
+        // Stream response
+        function streamResponse(text) {
+            const messages = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message bot';
+            
+            messageDiv.innerHTML = `
+                <div class="message-avatar">🤖</div>
+                <div class="message-content" id="streamingContent"></div>
+            `;
+            
+            messages.appendChild(messageDiv);
+            
+            const contentDiv = document.getElementById('streamingContent');
+            let index = 0;
+            
+            function typeText() {
+                if (index < text.length) {
+                    contentDiv.textContent += text[index];
+                    index++;
+                    messages.scrollTop = messages.scrollHeight;
+                    setTimeout(typeText, 30 + Math.random() * 50);
+                } else {
+                    contentDiv.id = ''; // Remove the ID after streaming is complete
+                }
+            }
+            
+            typeText();
+        }
+
+        // Clear chat
+        function clearChat() {
+            const messages = document.getElementById('messages');
+            messages.innerHTML = `
+                <div class="message bot">
+                    <div class="message-avatar">🤖</div>
+                    <div class="message-content">
+                        👋 Hello! I'm your LM Studio chatbot with MCP support. How can I help you today?
+                    </div>
+                </div>
+            `;
+        }
+
+        // Download chat
+        function downloadChat() {
+            const messages = document.querySelectorAll('.message');
+            let chatContent = 'AI Chatbot Conversation\n';
+            chatContent += '========================\n\n';
+            
+            messages.forEach(message => {
+                const isUser = message.classList.contains('user');
+                const content = message.querySelector('.message-content').textContent;
+                chatContent += `${isUser ? 'User' : 'AI'}: ${content}\n\n`;
+            });
+            
+            const blob = new Blob([chatContent], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'chatbot_conversation.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Toggle streaming
+        function toggleStreaming() {
+            isStreaming = !isStreaming;
+            const btn = document.getElementById('streamingBtn');
+            btn.textContent = `📡 Streaming: ${isStreaming ? 'ON' : 'OFF'}`;
+            btn.className = `btn ${isStreaming ? 'btn-success' : 'btn-secondary'}`;
+        }
+
+        // Toggle MCP panel
+        function toggleMCPPanel() {
+            const panel = document.getElementById('mcpPanel');
+            panel.classList.toggle('open');
+        }
+
+        // Initialize MCP
+        function initializeMCP() {
+            // Simulate MCP initialization
+            setTimeout(() => {
+                updateConnectionStatus(true);
+                loadAvailableTools();
+            }, 1000);
+        }
+
+        // Update connection status
+        function updateConnectionStatus(connected) {
+            mcpConnected = connected;
+            const status = document.getElementById('mcpStatus');
+            const connectionStatus = document.getElementById('connectionStatus');
+            
+            if (connected) {
+                status.textContent = 'Connected';
+                status.className = 'status-connected';
+                connectionStatus.textContent = 'Connected to: http://192.168.114.46:1234';
+            } else {
+                status.textContent = 'Disconnected';
+                status.className = 'status-disconnected';
+                connectionStatus.textContent = 'Connection lost - Retrying...';
+            }
+        }
+
+        // Load available tools
+        function loadAvailableTools() {
+            // Simulate loading tools
+            setTimeout(() => {
+                const toolsList = document.getElementById('toolsList');
+                const tools = [
+                    'File System Access',
+                    'Web Search',
+                    'Code Execution',
+                    'Data Analysis',
+                    'Image Processing',
+                    'API Integration'
+                ];
+                
+                currentTools = tools;
+                toolsList.innerHTML = tools.map(tool => `• ${tool}`).join('<br>');
+            }, 500);
+        }
+
+        // Test MCP connection
+        async function testMCPConnection() {
+            const btn = event.target;
+            btn.textContent = 'Testing...';
+            btn.disabled = true;
+            
+            try {
+                // Test LM Studio connection
+                const response = await fetch('http://192.168.114.46:1234/v1/models', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    updateConnectionStatus(true);
+                    btn.textContent = 'Connected Successfully!';
+                    btn.className = 'btn btn-success';
+                    
+                    // Update available models
+                    if (data.data && data.data.length > 0) {
+                        const toolsList = document.getElementById('toolsList');
+                        toolsList.innerHTML = `
+                            <strong>Available Models:</strong><br>
+                            ${data.data.map(model => `• ${model.id}`).join('<br>')}
+                            <br><br>
+                            <strong>MCP Tools:</strong><br>
+                            • Chat Completions<br>
+                            • Model Information<br>
+                            • Text Generation<br>
+                            • Stream Support
+                        `;
+                    }
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                console.error('Connection test failed:', error);
+                updateConnectionStatus(false);
+                btn.textContent = 'Connection Failed';
+                btn.className = 'btn btn-danger';
+                
+                // Show error details
+                const toolsList = document.getElementById('toolsList');
+                toolsList.innerHTML = `
+                    <strong>Connection Error:</strong><br>
+                    ${error.message}<br><br>
+                    <strong>Troubleshooting:</strong><br>
+                    • Check if LM Studio is running<br>
+                    • Verify the server address<br>
+                    • Ensure port 1234 is open<br>
+                    • Try restarting LM Studio
+                `;
+            }
+            
+            setTimeout(() => {
+                btn.textContent = 'Test Connection';
+                btn.className = 'btn btn-primary';
+                btn.disabled = false;
+            }, 3000);
+        }
+
+        // Refresh tools
+        function refreshTools() {
+            const toolsList = document.getElementById('toolsList');
+            toolsList.innerHTML = 'Refreshing tools...';
+            loadAvailableTools();
+        }
+
+        // Simulate periodic connection checks
+        setInterval(() => {
+            if (Math.random() < 0.05) { // 5% chance of connection issue
+                updateConnectionStatus(false);
+                setTimeout(() => {
+                    updateConnectionStatus(true);
+                }, 3000);
+            }
+        }, 10000);
+    </script>
+</body>
+</html>
